@@ -1,0 +1,116 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Getting to know RStudio
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+123 + 321
+```
+
+You can make a new code chunk by typing Ctrl + Alt + I, or going to the `Code` menu and typing insert chunk.
+
+Excercise: What is 555 devided by 55?
+
+# Libraries
+Libraries are sets of functions that will help us. R has loads of them. Here are the ones we'll use today.
+```{r}
+library(vegan)
+library(ggvegan)
+library(dplyr)
+library(readr)
+library(missForest)
+```
+
+
+# Bringing in some data. 
+We're going to work with some microbial sequence data from the American Gut project.
+It is microbiome data from lots of people. Learn more here
+https://microsetta.ucsd.edu/american-gut-project/
+
+```{r}
+samples <- read.csv("data/sample.amgut.csv") # Data about the different study participants
+otu <- read.csv("otu.amgut.csv") # Data about the microbial "Operational Taxonomic Units (OTUs)
+rownames(otu) <- otu$X
+otu <- otu[,-1]
+rownames(samples) <- samples$X
+```
+
+Excercise:  Look at the samples and OTU data. Are the columns of the OTUs the people or the taxa?
+```{r}
+totu <- t(otu)
+```
+
+Excercise: What about in `totu` ?
+
+OTU data are counts. That is they are the number of reads from the machine. When the machine has more reads per sample, you get more counts. This introduces artifacts. One of my favorite ways to deal with this is the
+"Centered Log Ratio" transform. This transform divides each value by the "average" (actually the geometric mean) number of counts seen in that sample and then takes the log of that value. 0 now corresponds to the "average sample". 
+The math breaks for zeros in the original dta so we add 1 to everything first (a `pseudocount`).
+
+```{r}
+clr <- decostand(totu, method = "clr", pseudocount = 1, margin = 1)
+```
+
+Excercise: What were the approximate ranges (high and low values) in `totu`. What about in `clr`?
+
+# Ordination
+One way to look at multivariate data and see if it relates to other data is with an ordination analysis. Here's an example
+
+I want to look at age. Annoyingly there are missing data and they are in the data as strings.
+First, converting data to numbers
+```{r}
+numberCols <- c("AGE", "TOT_MASS", "PROTEIN_PER", "PLANT_PER", "FAT_PER")
+samples2 <- samples %>%
+  mutate(across(.cols = all_of(numberCols) , .fns = parse_number))
+```
+Estimating the missing values and adding them back into samples2
+```{r}
+imp_result <- missForest(samples2[numberCols])
+samples2[numberCols] <- imp_result$ximp
+```
+
+
+
+```{r}
+mod <- rda(clr ~ AGE, data = samples2)
+```
+
+```{r}
+anova(mod, by = "margin")
+```
+```{r}
+sc <- fortify(mod, axes = c(1, 2), scaling = "symmetric")
+
+samples3 <- sc %>% 
+  filter(score == "sites") %>%
+  mutate(X.SampleID = parse_number(label)) %>%
+  left_join(samples2, by = join_by(X.SampleID))
+  
+
+p <- ggplot() +
+  # sites
+  geom_point(data = samples3,
+             aes(RDA1, PC1, color = AGE), alpha = 0.6) +
+  # species as points
+  geom_point(data = subset(sc, score == "species"), color = "red", shape = "+",
+             aes(RDA1, PC1), size = 3) +
+  # biplot (constraints) as arrows
+  geom_segment(data = subset(sc, score == "biplot"),
+               aes(x = 0, y = 0, xend = RDA1 * 5, yend = PC1),
+               arrow = arrow(length = unit(0.02, "npc"))) +
+  geom_text(data = subset(sc, score == "biplot"),
+               aes(x = RDA1 * 5.5, y = 0, label = label),
+               ) +
+  coord_equal() +
+  scale_color_viridis_c(direction = -1) + 
+  theme_minimal()
+
+p
+```
+Question: What are the red + signs?
+Exercise: Now do this for a different variable or set of variables.
