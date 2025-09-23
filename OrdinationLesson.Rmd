@@ -42,12 +42,20 @@ otu <- otu[,-1]
 rownames(samples) <- samples$X
 ```
 
-Excercise:  Look at the samples and OTU data. Are the columns of the OTUs the people or the taxa?
+Excercise:  Look at the samples and OTU data. Are the columns of the `otu` object the people or the taxa?
+
+# Wrangling the data
+In every analysis, there is some up-front work to make sure  your data meet the expectations of the programs you will use to model the data.
+For instanece vegan::rda expects the species to be columns and the samples to be rows. We can flip the rows and columns with the function `t()`
+"t" stands for "transpose"
+
 ```{r}
 totu <- t(otu)
 ```
 
-Excercise: What about in `totu` ?
+Excercise: In `totu` are the columns the people or the taxa?
+
+# Transforming the data
 
 OTU data are counts. That is they are the number of reads from the machine. When the machine has more reads per sample, you get more counts. This introduces artifacts. One of my favorite ways to deal with this is the
 "Centered Log Ratio" transform. This transform divides each value by the "average" (actually the geometric mean) number of counts seen in that sample and then takes the log of that value. 0 now corresponds to the "average sample". 
@@ -59,45 +67,64 @@ clr <- decostand(totu, method = "clr", pseudocount = 1, MARGIN = 1)
 
 Excercise: What were the approximate ranges (high and low values) in `totu`. What about in `clr`?
 
-# Ordination
-One way to look at multivariate data and see if it relates to other data is with an ordination analysis. Here's an example
 
-I want to look at age. Annoyingly there are missing data and they are in the data as strings.
+# Getting ready for Ordination analysis
+One way to look at multivariate data and see if it relates to other data is with an ordination analysis. In the following example
+I want to test whether AGE relates to microbial community structure.
+
+To my annoyance, age is in the dataframe `samples` as a character string. So a 42 year old is represented by the word
+"42" rather than the number 42. This is true of some other columns so lets fix those too.
+
 First, converting data to numbers
 ```{r}
 numberCols <- c("AGE", "TOT_MASS", "PROTEIN_PER", "PLANT_PER", "FAT_PER")
 samples2 <- samples %>%
   mutate(across(.cols = all_of(numberCols) , .fns = parse_number))
 ```
+The warnings above tell us that there are some values that couldn't be converted to numbers, and they are instead NA values
+
+Lets deal with those now using random forest imputation
+
 Estimating the missing values and adding them back into samples2
 ```{r}
 imp_result <- missForest(samples2[numberCols])
 samples2[numberCols] <- imp_result$ximp
 ```
 
+# Actually running the ordination analysis
 
+Once you have the data in the right format (hard), running the ordination is easy. It gives you a model, which here we are saving to the object
+`mod`
 
 ```{r}
 mod <- rda(clr ~ AGE, data = samples2)
 ```
 
+# Testing for significance
+`anova` can run a permutation test on the data in the cca model. by = margin tells it to seperate out significance scores for multiple variables
+if we have them (here we just have one variable, `AGE`).
 ```{r}
 anova(mod, by = "margin")
 ```
+
+Redundancy analyses also make nice looking plots..
+
 ```{r}
+# Pull the scores out of the `mod` object
 sc <- fortify(mod, axes = c(1, 2), scaling = "symmetric")
 
+# Do append the samples scores to the samples2 data
 samples3 <- sc %>% 
   filter(score == "sites") %>%
   mutate(X.SampleID = parse_number(label)) %>%
   left_join(samples2, by = join_by(X.SampleID))
   
-
+# make the plot
 p <- ggplot() +
-  # sites
+  # people as color coded dots with the color corresponding to the people's age
   geom_point(data = samples3,
              aes(RDA1, PC1, color = AGE), alpha = 0.6) +
-  # species as points
+  # species as + signs
   geom_point(data = subset(sc, score == "species"), color = "red", shape = "+",
              aes(RDA1, PC1), size = 3) +
   # biplot (constraints) as arrows
@@ -107,11 +134,22 @@ p <- ggplot() +
   geom_text(data = subset(sc, score == "biplot"),
                aes(x = RDA1 * 5.5, y = 0, label = label),
                ) +
+  # make the axes equivalent to eachother
   coord_equal() +
+  # change the color scale so its more readable
   scale_color_viridis_c(direction = -1) + 
+  # make the plot pretty
   theme_minimal()
 
+# actually display the plot
 p
 ```
+In this figure, the colorful circles represent the different samples (people) and the position of the points relates to their gut microbial
+community structure. Points that are closer together are people with more similar microbes. In a redundancy analysis, one or more axes correspond
+to variability in microbial community structure related to some variable. So in this case RDA1 represents microbial community variability that are related to age. Meanwhile PC1 represents variability not represented by age.
+
+Question: Do the participants neatly sort by age along the RDA1 axis?
+
 Question: What are the red + signs?
-Exercise: Now do this for a different variable or set of variables.
+Exercise: Change the analysis above so it looks at a variable besides "AGE". Is that variable statistically significantly related to 
+the microbiota? Remember, you can look at the samples, samples2 or samples3 object by clicking on them in the environment pane in the upper right.
