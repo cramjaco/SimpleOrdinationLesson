@@ -1,6 +1,6 @@
 ---
 title: "R Notebook"
-output: html_notebook
+output: html_document
 ---
 
 # Getting to know RStudio
@@ -21,6 +21,7 @@ Excercise: What is 555 devided by 55?
 Libraries are sets of functions that will help us. R has loads of them. Here are the ones we'll use today.
 ```{r}
 library(vegan)
+library(ggplot2)
 library(ggvegan)
 library(dplyr)
 library(readr)
