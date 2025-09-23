@@ -1,1 +1,2 @@
-install.packages(c("rmarkdown","vegan", "ggvegan", "dplyr", "tidyr", "readr", "missForest"))
+install.packages(c("rmarkdown","vegan", "remotes", "dplyr", "tidyr", "readr", "missForest"))
+remotes::install_github("gavinsimpson/ggvegan")
