@@ -35,7 +35,7 @@ https://microsetta.ucsd.edu/american-gut-project/
 
 ```{r}
 samples <- read.csv("data/sample.amgut.csv") # Data about the different study participants
-otu <- read.csv("otu.amgut.csv") # Data about the microbial "Operational Taxonomic Units (OTUs)
+otu <- read.csv("data/otu.amgut.csv") # Data about the microbial "Operational Taxonomic Units (OTUs)
 rownames(otu) <- otu$X
 otu <- otu[,-1]
 rownames(samples) <- samples$X
@@ -53,7 +53,7 @@ OTU data are counts. That is they are the number of reads from the machine. When
 The math breaks for zeros in the original dta so we add 1 to everything first (a `pseudocount`).
 
 ```{r}
-clr <- decostand(totu, method = "clr", pseudocount = 1, margin = 1)
+clr <- decostand(totu, method = "clr", pseudocount = 1, MARGIN = 1)
 ```
 
 Excercise: What were the approximate ranges (high and low values) in `totu`. What about in `clr`?
