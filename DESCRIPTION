@@ -1,0 +1,5 @@
+Package: simpleordinationlesson
+Type: Project
+Title: Binder Ordination Lesson
+Version: 0.0.1
+Description: Minimal file to ensure Binder selects the R buildpack.
